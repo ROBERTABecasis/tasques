@@ -27,14 +27,20 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Sync amb Notion i genera dashboard
+      - name: Sync amb Notion i genera dades
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
         run: python sync_and_render.py
 
+      - name: Preparar site
+        run: |
+          mkdir -p _site
+          cp index.html _site/
+          cp data.json _site/
+
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: '_site'
 
       - name: Deploy to GitHub Pages
         id: deployment

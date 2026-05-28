@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#fafaf8">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
+<title>Dashboard de la llar</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#2d2d2d;padding:16px;background:#fafaf8;max-width:600px;margin:0 auto;-webkit-font-smoothing:antialiased}
+
+.header{text-align:center;margin-bottom:20px}
+.header h1{font-size:22px;margin-bottom:4px}
+.header p{color:#888;font-size:12px}
+
+.months{display:flex;gap:6px;overflow-x:auto;padding:4px 0 12px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.months::-webkit-scrollbar{display:none}
+.month-btn{flex-shrink:0;padding:6px 14px;border-radius:20px;border:1.5px solid #e0e0de;background:white;font-size:12px;font-weight:500;color:#666;cursor:pointer;transition:all .15s}
+.month-btn.active{background:#2d2d2d;color:white;border-color:#2d2d2d}
+
+.score{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.card{border-radius:14px;padding:16px;text-align:center}
+.card.emma{background:linear-gradient(135deg,#ffe1ec,#ffd0e0)}
+.card.robert{background:linear-gradient(135deg,#d6e4ff,#bcd0ff)}
+.card .name{font-size:12px;font-weight:600;opacity:.6;letter-spacing:.5px}
+.card .num{font-size:38px;font-weight:700;line-height:1.1}
+.card .label{font-size:10px;opacity:.5;margin-top:2px}
+.winner{margin-top:8px;font-size:10px;font-weight:600;padding:3px 10px;border-radius:10px;display:inline-block;background:rgba(255,255,255,.7)}
+
+.ratio-bar{height:10px;border-radius:5px;overflow:hidden;display:flex;margin-bottom:6px;background:#eee}
+.ratio-emma{background:#ff7eb0}
+.ratio-robert{background:#5b8def}
+.ratio-labels{display:flex;justify-content:space-between;font-size:11px;color:#888;margin-bottom:22px}
+
+.section{margin-bottom:22px}
+.section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.section h2{font-size:14px;font-weight:600;color:#444}
+.toggle-hidden{font-size:11px;color:#aaa;cursor:pointer;padding:4px 8px;border-radius:8px;border:1px solid #e8e8e6}
+.toggle-hidden:hover{background:#f0f0ee}
+
+.bar-row{display:flex;align-items:center;margin-bottom:8px;gap:8px}
+.bar-label{width:100px;font-size:11px;color:#555;flex-shrink:0;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-container{flex:1;height:20px;background:#f0f0ee;border-radius:5px;display:flex;overflow:hidden}
+.bar-emma{background:#ff7eb0;height:100%;transition:width .3s}
+.bar-robert{background:#5b8def;height:100%;transition:width .3s}
+.bar-counts{font-size:10px;color:#888;min-width:70px;text-align:right;white-space:nowrap}
+.bar-counts .ce{color:#b03060;font-weight:600}
+.bar-counts .cr{color:#2851b0;font-weight:600}
+.bar-hide{width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.3;font-size:13px;flex-shrink:0;border-radius:4px;transition:opacity .15s}
+.bar-hide:hover{opacity:.7;background:#f0f0ee}
+
+.hidden-section{margin-top:10px;padding:10px 14px;background:#f8f8f6;border-radius:10px;border:1px solid #eee}
+.hidden-section h3{font-size:12px;color:#aaa;margin-bottom:8px}
+.hidden-tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:4px 10px;margin:2px 4px 2px 0;border-radius:8px;background:white;border:1px solid #e8e8e6;color:#888;cursor:pointer}
+.hidden-tag:hover{border-color:#ccc;color:#555}
+
+.recent-list{background:white;border-radius:12px;padding:4px 14px;border:1px solid #f0f0ee}
+.recent-item{display:flex;justify-content:space-between;align-items:center;padding:8px 0;font-size:12px;border-bottom:1px solid #f5f5f3}
+.recent-item:last-child{border-bottom:none}
+.recent-task{color:#333}
+.recent-meta{display:flex;gap:6px;align-items:center}
+.recent-who{font-weight:600;padding:2px 8px;border-radius:7px;font-size:10px}
+.who-emma{background:#ffd0e0;color:#b03060}
+.who-robert{background:#bcd0ff;color:#2851b0}
+.who-both{background:#c5ecd0;color:#1f7a3a}
+.recent-date{color:#aaa;font-size:10px}
+
+.footer{text-align:center;color:#aaa;font-size:10px;margin-top:24px}
+.empty{text-align:center;color:#bbb;font-size:13px;padding:30px 0}
+
+.loading{text-align:center;color:#aaa;padding:60px 0;font-size:14px}
+</style>
+</head>
+<body>
+
+<div id="app"><div class="loading">Carregant...</div></div>
+
+<script>
+const MONTH_NAMES = ['Gen','Feb','Mar','Abr','Mai','Jun','Jul','Ago','Set','Oct','Nov','Des'];
+
+let allEntries = [];
+let hiddenTasks = new Set(JSON.parse(localStorage.getItem('hiddenTasks') || '[]'));
+let selectedMonth = null;
+let updatedAt = '';
+let showHidden = false;
+
+fetch('data.json')
+  .then(r => r.json())
+  .then(data => { allEntries = data.entries; updatedAt = data.updated; selectedMonth = currentMonth(); render(); })
+  .catch(err => { document.getElementById('app').innerHTML = '<div class="empty">Error carregant dades</div>'; });
+
+function currentMonth() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+
+function getMonths() {
+  const set = new Set();
+  allEntries.forEach(e => { if(e.date) set.add(e.date.slice(0,7)); });
+  return Array.from(set).sort().reverse();
+}
+
+function filterEntries(month) {
+  let entries = allEntries.filter(e => !hiddenTasks.has(e.task));
+  if (month) entries = entries.filter(e => e.date && e.date.startsWith(month));
+  return entries;
+}
+
+function saveHidden() {
+  localStorage.setItem('hiddenTasks', JSON.stringify(Array.from(hiddenTasks)));
+}
+
+function toggleHide(task) {
+  if (hiddenTasks.has(task)) hiddenTasks.delete(task);
+  else hiddenTasks.add(task);
+  saveHidden();
+  render();
+}
+
+function render() {
+  const months = getMonths();
+  const entries = filterEntries(selectedMonth);
+
+  let byPerson = {Emma:0, Robert:0};
+  let byTask = {};
+  entries.forEach(e => {
+    if (e.who === 'Els dos') { byPerson.Emma++; byPerson.Robert++; }
+    else if (byPerson[e.who] !== undefined) byPerson[e.who]++;
+
+    if (!byTask[e.task]) byTask[e.task] = {Emma:0, Robert:0, 'Els dos':0, total:0};
+    byTask[e.task][e.who] = (byTask[e.task][e.who]||0) + 1;
+    byTask[e.task].total++;
+  });
+
+  const emma = byPerson.Emma, robert = byPerson.Robert;
+  const total = emma + robert;
+  const ePct = total ? (emma/total*100) : 0;
+  const rPct = total ? (robert/total*100) : 0;
+
+  let eBadge, rBadge;
+  if (emma > robert) { eBadge='al podi'; rBadge='puja, puja'; }
+  else if (robert > emma) { eBadge='puja, puja'; rBadge='al podi'; }
+  else { eBadge='empat'; rBadge='empat'; }
+
+  const sortedTasks = Object.entries(byTask).sort((a,b) => b[1].total - a[1].total);
+  const recent = entries.slice(0, 10);
+
+  const monthLabel = selectedMonth
+    ? MONTH_NAMES[parseInt(selectedMonth.slice(5))-1] + ' ' + selectedMonth.slice(0,4)
+    : 'Tot';
+
+  let html = `
+    <div class="header">
+      <h1>Dashboard de la llar</h1>
+      <p>${entries.length} tasques registrades &middot; ${monthLabel}</p>
+    </div>
+
+    <div class="months">
+      ${months.map(m => {
+        const label = MONTH_NAMES[parseInt(m.slice(5))-1] + ' ' + m.slice(2,4);
+        return `<button class="month-btn ${m===selectedMonth?'active':''}" onclick="selectedMonth='${m}';render()">${label}</button>`;
+      }).join('')}
+      <button class="month-btn ${selectedMonth===null?'active':''}" onclick="selectedMonth=null;render()">Tot</button>
+    </div>
+
+    <div class="score">
+      <div class="card emma">
+        <div class="name">EMMA</div>
+        <div class="num">${emma}</div>
+        <div class="label">tasques</div>
+        <div class="winner">${eBadge}</div>
+      </div>
+      <div class="card robert">
+        <div class="name">ROBERT</div>
+        <div class="num">${robert}</div>
+        <div class="label">tasques</div>
+        <div class="winner">${rBadge}</div>
+      </div>
+    </div>
+
+    <div class="ratio-bar">
+      <div class="ratio-emma" style="width:${ePct.toFixed(1)}%"></div>
+      <div class="ratio-robert" style="width:${rPct.toFixed(1)}%"></div>
+    </div>
+    <div class="ratio-labels">
+      <span>Emma ${Math.round(ePct)}%</span>
+      <span>Robert ${Math.round(rPct)}%</span>
+    </div>
+  `;
+
+  if (sortedTasks.length) {
+    html += `<div class="section">
+      <div class="section-header">
+        <h2>Per tasca</h2>
+        ${hiddenTasks.size ? `<span class="toggle-hidden" onclick="showHidden=!showHidden;render()">${showHidden?'Amaga':'Mostra'} amagades (${hiddenTasks.size})</span>` : ''}
+      </div>`;
+
+    sortedTasks.forEach(([task, counts]) => {
+      const eCount = counts.Emma + counts['Els dos'] * 0.5;
+      const rCount = counts.Robert + counts['Els dos'] * 0.5;
+      const barTotal = eCount + rCount;
+      if (!barTotal) return;
+      const eW = (eCount/barTotal)*100;
+      const rW = (rCount/barTotal)*100;
+      const displayName = task.length > 16 ? task.slice(0,15)+'…' : task;
+
+      html += `
+        <div class="bar-row">
+          <div class="bar-label" title="${task}">${displayName}</div>
+          <div class="bar-container">
+            <div class="bar-emma" style="width:${eW}%"></div>
+            <div class="bar-robert" style="width:${rW}%"></div>
+          </div>
+          <div class="bar-counts"><span class="ce">${counts.Emma + counts['Els dos']}</span> / <span class="cr">${counts.Robert + counts['Els dos']}</span></div>
+          <div class="bar-hide" onclick="toggleHide('${task.replace(/'/g,"\\'")}')" title="Amagar">&#x1f441;</div>
+        </div>`;
+    });
+
+    if (showHidden && hiddenTasks.size) {
+      html += `<div class="hidden-section"><h3>Tasques amagades</h3>`;
+      hiddenTasks.forEach(t => {
+        html += `<span class="hidden-tag" onclick="toggleHide('${t.replace(/'/g,"\\'")}')">${t} &#x2715;</span>`;
+      });
+      html += `</div>`;
+    }
+
+    html += `</div>`;
+  }
+
+  if (recent.length) {
+    html += `<div class="section"><h2>Darreres tasques</h2><div class="recent-list">`;
+    recent.forEach(e => {
+      const d = e.date.slice(8,10) + '/' + e.date.slice(5,7);
+      const cls = e.who === 'Emma' ? 'who-emma' : e.who === 'Robert' ? 'who-robert' : 'who-both';
+      html += `
+        <div class="recent-item">
+          <span class="recent-task">${e.task}</span>
+          <div class="recent-meta">
+            <span class="recent-date">${d}</span>
+            <span class="recent-who ${cls}">${e.who}</span>
+          </div>
+        </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  if (!entries.length) {
+    html += `<div class="empty">Cap tasca registrada en aquest periode</div>`;
+  }
+
+  const updLabel = updatedAt ? new Date(updatedAt).toLocaleString('ca-ES',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+  html += `<div class="footer">Actualitzat: ${updLabel}</div>`;
+
+  document.getElementById('app').innerHTML = html;
+}
+</script>
+</body>
+</html>
